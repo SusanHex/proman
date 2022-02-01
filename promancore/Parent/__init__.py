@@ -1,8 +1,5 @@
-from cgitb import text
-from distutils import command
 from queue import Queue
 import queue
-from sys import excepthook
 from threading import Thread
 from subprocess import Popen, PIPE
 from typing import TextIO, IO
@@ -89,14 +86,17 @@ class Parent(object):
         
 
 
-    def read(self, wait = False) -> str:
+    def read(self, wait = False, error=False) -> str:
         self._checkRunning()
         try:
-            return self._stdout_queue.get(wait)
+            if error:
+                return self._stderr_queue.get(wait)
+            else:
+                return self._stdout_queue.get(wait)
         except queue.Empty:
             return ''
 
-    def readlines(self, limit = 0) -> list:
+    def readlines(self, limit=0) -> list:
         self._checkRunning()
         lines=[]
         if limit > 0:
@@ -118,6 +118,9 @@ class Parent(object):
         self._stdin_queue.put(line + end)
     
 
+    @property
+    def running(self):
+        return False if self._process is none or self._process.poll() is not None else True
         
     def _checkRunning(self) -> None:
         if self._process is None:
@@ -128,7 +131,7 @@ class Parent(object):
 
 
 
-    @ staticmethod
+    @staticmethod
     def _reader(child_process: Popen, message_queue: Queue, stream: TextIO) -> None:
         while child_process.poll() is None:
             try:
@@ -142,7 +145,7 @@ class Parent(object):
                 message_queue.get()
                 message_queue.put(message_queue)
 
-    @ staticmethod
+    @staticmethod
     def _writer(child_process: Popen, message_queue: Queue, stream: TextIO):
         while child_process.poll() is None:
             send_data=message_queue.get()
