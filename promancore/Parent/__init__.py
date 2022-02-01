@@ -120,7 +120,7 @@ class Parent(object):
 
     @property
     def running(self):
-        return False if self._process is none or self._process.poll() is not None else True
+        return False if self._process is None or self._process.poll() is not None else True
         
     def _checkRunning(self) -> None:
         if self._process is None:

@@ -20,7 +20,8 @@ def sinman():
     parent_instance = Parent(args.arg)
     parent_instance.run()
     # start consumer thread
-    consumer_thread = Thread()
+    consumer_thread = Thread(target=outputConsumer, args=(parent_instance,))
+    consumer_thread.start()
 
 if __name__ == '__main__':
     sinman()
