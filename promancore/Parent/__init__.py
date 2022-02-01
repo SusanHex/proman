@@ -1,4 +1,3 @@
-from asyncio.subprocess import PIPE
 from queue import Queue
 import queue
 import stat
@@ -31,7 +30,7 @@ class Parent(object):
     
         
     def run(self) -> None:
-        pass
+        self._child_process = Popen()
         
     @staticmethod
     def _reader(child_process: Popen, message_queue: Queue, stream: TextIO) -> None:
