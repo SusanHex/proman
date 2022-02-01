@@ -1,28 +1,36 @@
+from distutils import command
 from queue import Queue
 import queue
-import stat
+from sys import excepthook
 from threading import Thread
 from subprocess import Popen, PIPE
-from typing import TextIO
+from typing import TextIO, IO
+from cmd import Cmd
+from shlex import split
 
 class Parent(object):
     """[summary]
         A class to control the stdout, stderr, and stdin of a child process.
     """
     
-    def __init__(self, max_queue_size=0, dedicated_stderr_queue=False, run=False) -> None:
+    def __init__(self, command: str, executable=None, max_queue_size=0, dedicated_stderr_queue=False, run=False) -> None:
 
+        # parse the command string set process init data
+        self._args = split(command))
+        self._executable = executable
         # init process queues
         self._stdout_queue = Queue(maxsize=max_queue_size)
         self._stdin_queue = Queue(maxsize=max_queue_size)
         if dedicated_stderr_queue:
             self._stderr_queue = Queue(maxsize=max_queue_size)
         else:
-            self._stderr_queue = self._stdout_queue
+            self._stderr_queue = None
         
         # create thread instances
         self._stdout_worker = Thread()
         self._stdin_worker = Thread()
+        if self._stderr_queue:
+            self._stderr_worker = Thread()
         
         # if run, call the run func
         if run:
@@ -31,11 +39,17 @@ class Parent(object):
         
     def run(self) -> None:
         self._child_process = Popen()
+    
+    def
         
     @staticmethod
     def _reader(child_process: Popen, message_queue: Queue, stream: TextIO) -> None:
         while child_process.poll() is None:
-            process_data = stream.readline()
+            try:
+                process_data = stream.readline()
+            except OSError as e:
+                print(f"Writer Thread has encountered an error: {e}")
+                break
             try:
                 message_queue.put(process_data)
             except queue.Full:
@@ -46,11 +60,17 @@ class Parent(object):
     def _writer(child_process: Popen, message_queue: Queue, stream: TextIO):
         while child_process.poll() is None:
             send_data = message_queue.get()
-            stream.write(send_data)
-            
+            try:
+                stream.write(send_data)
+                message_queue.task_done()
+            except OSError as e:
+                print(f"Writer Thread has encountered an error: {e}")
+                break
                 
-                
-        
+
+class ParentCLI(Cmd):
+    def __init__(self, completekey: str = ..., stdin: IO[str] = ..., stdout: IO[str] = ...) -> None:
+        super().__init__(completekey, stdin, stdout)
             
         
         
