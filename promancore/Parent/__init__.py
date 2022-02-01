@@ -15,14 +15,13 @@ class Parent(object):
         A class to control the stdout, stderr, and stdin of a child process.
     """
 
-    def __init__(self, command: str, executable=None, max_queue_size=0, dedicated_stderr_queue=False, run=False) -> None:
+    def __init__(self, command: str, executable=None, max_queue_size=0, run=False) -> None:
 
         # parse the command string set process init data
-        self._args = split(command))
+        self._args = split(command)
         self._executable=executable
         # create child process instance
-        self._process=Popen(self._args, executable = executable,
-                            stdout = PIPE, stdin = PIPE, stderr = PIPE, text = True)
+        self._process=None
 
         # init process queues
         self._stdout_queue=Queue(maxsize = max_queue_size)
@@ -30,40 +29,75 @@ class Parent(object):
         self._stderr_queue=Queue(maxsize = max_queue_size)
 
 
+        # if run, call the run func
+        if run:
+            self.run()
+
+    def run(self):
+        # create child process instance
+        self._process=Popen(self._args, executable = self._executable,
+                            stdout = PIPE, stdin = PIPE, stderr = PIPE, text = True)
+
         # create thread instances
         self._stdout_worker=Thread(
-            target = self._reader, args = (
+            target = self._reader, daemon=True, args = (
                 self._process,
                 self._stdout_queue,
                 self._process.stdout,
                 ))
         self._stdin_worker=Thread(
-            target = self._writer, args = (
+            target = self._writer, daemon=True, args = (
                 self._process,
                 self._stdin_queue,
                 self._process.stdin,
             ))
         if self._stderr_queue:
             self._stderr_worker=Thread(
-                target = self._reader, args = (
+                target = self._reader, daemon=True, args = (
                     self._process,
                     self._stderr_queue,
                     self._process.stderr,
                 ))
-
-        # if run, call the run func
-        if run:
-            self.run()
-
+        
+        # start threads
+        self._stdout_worker.start()
+        self._stderr_worker.start()
+        self._stdin_worker.start()
+    
+    def close(self) -> bool:
+        try:
+            self._checkRunning()
+            self._process.terminate()
+        except (ValueError, OSError):
+            self._process.kill()
+        finally:
+            self._stderr_worker.join()
+            self._stdout_worker.join()
+            self._stdin_worker.join()
+        return True
+    
+    def status(self) -> dict:
+        return {
+            'Process': 'NOT RAN' if self._process is None else self._process.poll(),
+            'Output Worker': self._stdout_worker.is_alive(),
+            'Error Worker': self._stderr_worker.is_alive(),
+            'Input Worker': self._stdin_worker.is_alive(),
+            'Output Queue': self._stdout_queue.qsize(),
+            'Error Queue': self._stderr_queue.qsize(),
+            'Input Queue': self._stdin_queue.qsize()
+                }
+        
 
 
     def read(self, wait = False) -> str:
+        self._checkRunning()
         try:
             return self._stdout_queue.get(wait)
         except queue.Empty:
             return ''
 
     def readlines(self, limit = 0) -> list:
+        self._checkRunning()
         lines=[]
         if limit > 0:
             for i in range(limit):
@@ -79,7 +113,19 @@ class Parent(object):
                 except queue.Empty:
                     return lines
 
-    def write(line: str, end = '\n') -> None:
+    def write(self, line: str, end = '\n') -> None:
+        self._checkRunning()
+        self._stdin_queue.put(line + end)
+    
+
+        
+    def _checkRunning(self) -> None:
+        if self._process is None:
+            raise ValueError('Child process has not been ran/inited')
+        elif self._process.poll() is None:
+            raise OSError('Action attempted on a closed childprocess')
+    
+
 
 
     @ staticmethod
@@ -108,6 +154,6 @@ class Parent(object):
                 break
 
 
-class ParentCLI(Cmd):
+class SingleParentCLI(Cmd):
     def __init__(self, completekey: str = ..., stdin: IO[str] = ..., stdout: IO[str] = ...) -> None:
         super().__init__(completekey, stdin, stdout)
