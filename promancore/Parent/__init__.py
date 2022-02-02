@@ -33,7 +33,7 @@ class Parent(object):
     def run(self):
         # create child process instance
         self._process=Popen(self._args, executable = self._executable,
-                            stdout = PIPE, stdin = PIPE, stderr = PIPE, text = True)
+                            stdout = PIPE, stdin = PIPE, stderr = PIPE, universal_newlines = True, bufsize = 1)
 
         # create thread instances
         self._stdout_worker=Thread(
@@ -68,9 +68,13 @@ class Parent(object):
         except (ValueError, OSError):
             self._process.kill()
         finally:
+            print('Killing Threads')
             self._stderr_worker.join()
+            print('killed stderr')
             self._stdout_worker.join()
+            print('killed stdout')
             self._stdin_worker.join()
+            print('killed stdin')
         return True
     
     def status(self) -> dict:
@@ -84,10 +88,11 @@ class Parent(object):
             'Input Queue': self._stdin_queue.qsize()
                 }
         
-
+    def isOutput(self):
+        return self._stdout_queue.qsize() + self._stderr_queue.qsize()
 
     def read(self, wait = False, error=False) -> str:
-        self._checkRunning()
+        # self._checkRunning()
         try:
             if error:
                 return self._stderr_queue.get(wait)
@@ -113,9 +118,9 @@ class Parent(object):
                 except queue.Empty:
                     return lines
 
-    def write(self, line: str, end = '\n') -> None:
+    def write(self, line: str, end = '\r\n') -> None:
         self._checkRunning()
-        self._stdin_queue.put(line + end)
+        self._stdin_queue.put(f"{line}{end}")
     
 
     @property
@@ -125,7 +130,7 @@ class Parent(object):
     def _checkRunning(self) -> None:
         if self._process is None:
             raise ValueError('Child process has not been ran/inited')
-        elif self._process.poll() is None:
+        elif self._process.poll() is not None:
             raise OSError('Action attempted on a closed childprocess')
     
 
@@ -148,13 +153,17 @@ class Parent(object):
     @staticmethod
     def _writer(child_process: Popen, message_queue: Queue, stream: TextIO):
         while child_process.poll() is None:
-            send_data=message_queue.get()
-            try:
-                stream.write(send_data)
-                message_queue.task_done()
-            except OSError as e:
-                print(f"Writer Thread has encountered an error: {e}")
-                break
+            send_data = None
+            if message_queue.qsize() > 0:
+                send_data = message_queue.get()
+            if send_data:
+                print(f"found {send_data}")
+                try:
+                    stream.write(send_data)
+                    message_queue.task_done()
+                except OSError as e:
+                    print(f"Writer Thread has encountered an error: {e}")
+                    break
 
 
 class SingleParentCLI(Cmd):
