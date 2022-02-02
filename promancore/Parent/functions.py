@@ -8,7 +8,7 @@ def outputConsumer(parent_instance: Parent):
         try:
             line = parent_instance.read()
             if line:
-                stdout.write(line)
+                print(line, end='')
             line = parent_instance.read(error=True)
             if line:
                 stderr.write(line)

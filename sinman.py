@@ -1,6 +1,4 @@
-from ast import parse
-from multiprocessing import parent_process
-from promancore.Parent import Parent
+from promancore.Parent import Parent, SingleParentCLI
 from promancore.Parent.functions import outputConsumer
 from argparse import ArgumentParser
 from threading import Thread
@@ -23,11 +21,7 @@ def sinman():
     # start consumer thread
     consumer_thread = Thread(target=outputConsumer, args=(parent_instance,))
     consumer_thread.start()
-    import time; time.sleep(3)
-    parent_instance.write('exit')
-    time.sleep(3)
-    print('closing file')
-    parent_instance.close()
-    print('closed File')
+    SingleParentCLI(parent_instance).cmdloop()
+    
 if __name__ == '__main__':
     sinman()

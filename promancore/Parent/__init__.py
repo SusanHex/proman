@@ -15,6 +15,8 @@ class Parent(object):
     def __init__(self, command: str, executable=None, max_queue_size=0, run=False) -> None:
 
         # parse the command string set process init data
+        if not command:
+            raise ValueError('Command must not be empty')
         self._args = split(command)
         self._executable=executable
         # create child process instance
@@ -118,9 +120,9 @@ class Parent(object):
                 except queue.Empty:
                     return lines
 
-    def write(self, line: str, end = '\r\n') -> None:
+    def write(self, line: str, end = '\n') -> None:
         self._checkRunning()
-        self._stdin_queue.put(f"{line}{end}")
+        self._stdin_queue.put(line if '\n' in line else line + end)
     
 
     @property
@@ -157,7 +159,6 @@ class Parent(object):
             if message_queue.qsize() > 0:
                 send_data = message_queue.get()
             if send_data:
-                print(f"found {send_data}")
                 try:
                     stream.write(send_data)
                     message_queue.task_done()
@@ -167,5 +168,17 @@ class Parent(object):
 
 
 class SingleParentCLI(Cmd):
-    def __init__(self, completekey: str = ..., stdin: IO[str] = ..., stdout: IO[str] = ...) -> None:
-        super().__init__(completekey, stdin, stdout)
+    
+    def __init__(self, parent_instance: Parent):
+        super().__init__()
+        self._parent = parent_instance
+        self.prompt = ''
+        self.use_rawinput = 0
+    
+    def default(self, line):
+        self._parent.write(line=line)
+    
+    def emptyline(self) -> None:
+        self.default('')
+        
+        
