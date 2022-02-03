@@ -31,6 +31,9 @@ class Parent(object):
         # if run, call the run func
         if run:
             self.run()
+    
+    def __del__(self):
+        self.close()
 
     def run(self):
         # create child process instance
@@ -70,13 +73,9 @@ class Parent(object):
         except (ValueError, OSError):
             self._process.kill()
         finally:
-            print('Killing Threads')
             self._stderr_worker.join()
-            print('killed stderr')
             self._stdout_worker.join()
-            print('killed stdout')
             self._stdin_worker.join()
-            print('killed stdin')
         return True
     
     def status(self) -> dict:
@@ -127,7 +126,7 @@ class Parent(object):
 
     @property
     def running(self):
-        return False if self._process is None or self._process.poll() is not None else True
+        return True if self._process is not None and self._process.poll() is None else False
         
     def _checkRunning(self) -> None:
         if self._process is None:
@@ -176,9 +175,30 @@ class SingleParentCLI(Cmd):
         self.use_rawinput = 0
     
     def default(self, line):
-        self._parent.write(line=line)
+        if self._parent.running:
+            self._parent.write(line=line)
+
     
     def emptyline(self) -> None:
-        self.default('')
+        if self._parent.running:
+            self.default('\n')
+
+    def do_shell(self, line):
+        if 's' in line.lower()[0]:
+            print(self._parent.status())
+        elif 'c' in line.lower()[0]:
+            print('Killing the child...')
+            self._parent.close()
+            print(self._parent.status())    
         
+    
+    def postloop(self) -> None:
+        return self._parent.close()
+    
+    
+    def postcmd(self, stop: bool, line: str) -> bool:
+        if self._parent.running:
+            return False
+        else:
+            return True
         

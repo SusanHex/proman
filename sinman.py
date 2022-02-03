@@ -21,7 +21,10 @@ def sinman():
     # start consumer thread
     consumer_thread = Thread(target=outputConsumer, args=(parent_instance,))
     consumer_thread.start()
-    SingleParentCLI(parent_instance).cmdloop()
+    try:
+        SingleParentCLI(parent_instance).cmdloop()
+    except KeyboardInterrupt:
+        parent_instance.close()
     
 if __name__ == '__main__':
     sinman()
